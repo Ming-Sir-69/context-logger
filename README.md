@@ -9,13 +9,10 @@ AI 对话上下文自动保存工具 — 同时支持 **Claude Code** 和 **Code
 ```bash
 git clone https://github.com/Ming-Sir-69/context-logger.git
 cd context-logger
-
-# Claude Code 用户
-bash install.sh claude
-
-# Codex Desktop 用户
-bash install.sh codex
+bash install.sh
 ```
+
+脚本会自动检测本地已安装的 Claude Code 和 Codex Desktop，识别到什么装什么。如果都识别不到，会交互询问。
 
 ## 使用
 
