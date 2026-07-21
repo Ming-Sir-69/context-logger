@@ -1,0 +1,29 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Context Logger runtime (local session data)
+.cc-switch/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
