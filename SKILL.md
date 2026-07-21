@@ -1,89 +1,91 @@
 ---
 name: context-logger
-description: 保存当前 AI 对话的完整上下文到项目 transcripts 目录。同时产出原始 JSONL 增量 + 压缩 Markdown 精要。基于双格式 Entry ID 去重，永不重复。
+description: 保存或恢复当前 Codex、Claude Code 开发 Session。用户说「记录上下文」「保存上下文」「存档对话」「记录对话」「存个档」「上下文快照」「save context」「checkpoint」或要求从已归档 Session 恢复开发上下文时使用；只有明确要求整理旧归档时才使用 merge --legacy。
 ---
 
-# AI 指令：Context Logger
+# Context Logger
 
-## 触发条件
+## 保存前必须精确解析
 
-用户说出以下任一短语时立即执行：
-- "记录上下文" / "保存上下文" / "存档对话" / "记录对话" / "存个档" / "上下文快照"
-- "save context" / "checkpoint"
-- "合并上下文" / "整理上下文"
+每次保存先运行只读 `resolve`。必须取得：
 
-## 执行步骤
+- 当前来源与 Session ID；
+- `complete` 完整性；
+- `exact_session` 或用户明确提供文件形成的 `explicit_session_file`；
+- 当前任务工作区；
+- 已确认模块及其 `project_context/transcripts`。
 
-### Step 1: 确定运行环境
-
-检测环境中存在哪个目录来决定使用哪个脚本路径：
-
-~/.claude（Claude Code）
-~/.codex（Codex Desktop）
-两者都安装时：根据当前 AI 种类选择。
-
-### Step 2: 执行保存
+Codex 优先使用当前 Thread ID：
 
 ```bash
-python3 <脚本路径>/transcript_manager.py save
+python3 <Skill目录>/scripts/transcript_manager.py resolve \
+  --source codex \
+  --session-id <当前Thread ID> \
+  --project-root <工作区绝对路径> \
+  --module-id <已登记模块ID>
 ```
 
-**说明**：脚本会自动定位项目目录（依赖 `item_fille/` 结构或 `--project-root` 参数）。如果自动定位失败，手动指定：
+Claude Code 优先使用当前 Session 的 Hook 环境锚点或 Session ID。没有精确锚点时
+使用显式 `--session-file`，不得选择“最新 Claude Session”。
+
+如果根目录存在 `workspace.json` 且
+`context_policy=require_registered_module`，必须命中登记模块。显式
+`--target-dir` 也必须等于登记模块的 Transcript 路径。
+
+来源、Session、工作区、模块或目标任一项冲突时停止，不写入。
+
+## 保存
+
+确认 `resolve` 后，用完全相同的来源、Session、工作区、模块和目标参数执行
+`save`。不得在两条命令之间切换目标。
+
+保存后报告：
+
+- `new_raw_entries` 和 `total_raw_entries`；
+- Session 目录；
+- Normalized 事件数和 Markdown Chunk 数；
+- `derived_health`；
+- 任何降级或失败。
+
+派生层失败且 `raw_saved=true` 时，不要重复猜测其他 Session。使用同一目标执行
+`rebuild-index`，随后运行 `verify`。
+
+## 恢复上下文
+
+1. 先读取模块 `INDEX.md`；
+2. 使用 `search --query ... --budget-chars ...` 检索；
+3. 根据命中的 Session、Chunk、事件和 Raw 引用判断相关性；
+4. 使用 `show` 读取一个 Session Index、一个 Chunk 或一个事件；
+5. 只有证据不足时再扩大查询或字符预算。
+
+禁止直接读取整个 Transcript 目录或一次加载所有 Raw。
+
+## 核验
+
+完成保存或重建后运行 `verify`。只有同时出现：
+
+```text
+verified=true
+issue_count=0
+```
+
+才可以报告归档闭环通过。
+
+## 旧布局
+
+`status` 可以识别旧平铺 `raw/`、`compressed/` 和 `.transcript_state`，但不得自动
+移动、删除或覆盖。只有用户明确要求整理旧归档时才执行：
 
 ```bash
-python3 <脚本路径>/transcript_manager.py save --project-root /当前/项目/路径
+python3 <Skill目录>/scripts/transcript_manager.py merge \
+  --legacy \
+  --target-dir <已确认目标>
 ```
 
-### Step 3: 报告结果
+## 来源边界
 
-告知用户：
-- 新增条目数 / 总存档 ID 数
-- JSONL 和 MD 文件大小
-- 如果碎片文件 > 10 个，建议用 `merge` 整理
-
-## 产物存放位置
-
-```
-<项目>/project_context/transcripts/
-├── .transcript_state              ← 状态文件
-├── raw/                           ← 原始 JSONL
-│   ├── transcript_<时间>_incremental.jsonl
-│   └── _archive/
-└── compressed/                    ← 压缩 Markdown
-    └── transcript_<时间>_incremental_compressed.md
-```
-
-## 注意事项（AI 必须遵守）
-
-### 关于 merge
-
-**日常存档只用 `save` 命令。** `merge` 命令会把旧碎片文件移入 `raw/_archive/`，从 `raw/` 目录看就像"被清空"。
-
-仅在以下条件同时满足时才考虑 `merge`：
-1. 用户明确说「合并上下文」「整理上下文」
-2. `raw/` 下的增量碎片文件超过 10 个
-3. 先用 `status` 确认当前没有待保存的新条目
-
-### 关于读取存档
-
-**禁止直接 `Read` 整个 transcripts/ 目录下的文件。** JSONL 存档可能高达 52MB 以上，全量读取会撑爆上下文。
-
-需要查看存档内容时：
-1. 先用 `grep` 搜索关键词确认目标在哪个文件
-2. 用 `Read offset/limit` 局部读取（一次不超过 100 行）
-3. 压缩 MD 文件也需控制读取量
-
-## 主要函数与命令参考
-
-| 函数 | 作用 |
-|------|------|
-| `save` | 增量保存新条目 + 压缩 MD |
-| `status` | 查看存档状态、待保存数 |
-| `merge` | 合并去重（谨慎使用） |
-| `compress <input> [output]` | 手动压缩 JSONL |
-
-核心特性：
-- **双格式去重**：兼容 Claude 的 `uuid` 和 Codex 的复合键（`timestamp|type|payload_type|role|turn_id`）
-- **_source 标记**：每条条目自动标记来源环境（`codex` / `claude`）
-- **TypeError 防御**：压缩引擎已修复 list/dict/str 三种 output 类型的安全处理
-- **压缩降级**：压缩异常时写兜底说明，原始 JSONL 不会丢失
+- Raw 是事实源，不得重新序列化或注入字段；
+- Claude Cowork 不是 Claude Code；完整转录未经验证时只报告 `unsupported`；
+- Cowork 失败时不得回退到最新 Claude Code Session；
+- ChatGPT 普通聊天与账户级导出不属于本 Skill 当前保存范围；
+- Transcript 可能包含敏感信息，不复制凭证或大段 Raw 到回复、日志或公开仓库。
