@@ -27,31 +27,48 @@ Context Logger 将 Codex 或 Claude Code 的一个明确 Session 保存为可核
 
 ## 安装
 
-默认安装到 Context Logger 的运行目录，并保留式注册 Claude Code
-`SessionStart` 锚点：
+在仓库根目录运行以下入口，会为真实的 Claude Code 配置保留式注册
+`SessionStart` 锚点：写入 `~/.claude/settings.json` 与
+`~/.claude/hooks/context-logger-session-anchor.sh`，使用当前仓库的脚本。
+`install.sh` 不转发命令行参数，不能通过这个 shell 入口指定临时目标或恢复基线。
 
 ```bash
 bash install.sh
 ```
 
-临时验收安装不会修改真实 Hook：
+需要隔离核对 Hook 配置时，直接使用 Python 安装入口，并将 settings 与 Hook
+两个写入目标都指定到同一个新建临时目录：
 
 ```bash
-bash install.sh --target /absolute/path/to/temp-skill
+context_logger_check_dir="$(mktemp -d)"
+python3 scripts/install_claude_hook.py \
+  --settings "$context_logger_check_dir/settings.json" \
+  --script "$PWD/scripts/transcript_manager.py" \
+  --hook-script "$context_logger_check_dir/context-logger-session-anchor.sh"
 ```
 
-安装器会保留 Claude 的其他设置与 Hook，并在首次修改前创建
-`settings.json.context-logger.bak`。
+此例只为临时目标生成 settings、备份和 Hook 文件，不向真实的 `~/.claude/`
+登记 Hook；它不把整个工具复制到临时目录。以上命令依据当前源码静态核对，未实际执行。
 
-如果现有 `settings.json` 的 `hooks` 缺失或为 `null`，安装器会停止，避免把未知的
-既有登记误当成空配置。确认可信基线后可显式恢复：
+安装器会保留 Claude 的其他设置与其他 Hook，并在没有既有备份时创建
+`settings.json.context-logger.bak`；已有备份不会覆盖。
+
+如果已有 `settings.json` 的 `hooks` 缺失或为 `null`，安装器会停止，避免把未知的
+既有登记误当成空配置。确认可信基线后，通过 Python 入口显式恢复。下面是真实
+Claude 配置的恢复示例，会写入真实 settings 与 Hook；必须先将基线路径替换为
+已确认的本机文件：
 
 ```bash
-bash install.sh --restore-hooks-from /absolute/path/to/hooks-baseline.json
+python3 scripts/install_claude_hook.py \
+  --settings "$HOME/.claude/settings.json" \
+  --script "$PWD/scripts/transcript_manager.py" \
+  --hook-script "$HOME/.claude/hooks/context-logger-session-anchor.sh" \
+  --restore-hooks-from "/absolute/path/to/hooks-baseline.json"
 ```
 
-基线文件必须包含非空的 `{ "hooks": { ... } }`。安装只恢复该字段，其他 Claude
-设置及原文件权限保持不变。
+基线文件必须包含非空的 `{ "hooks": { ... } }`。恢复只取基线的 `hooks` 字段，随后
+保留式登记本工具的 `SessionStart` Hook；其他 Claude 设置及原 settings 文件权限
+保持不变。本次未运行恢复命令或修改任何 Hook。
 
 ## 精确解析
 
