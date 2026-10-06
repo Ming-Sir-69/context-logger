@@ -7,7 +7,7 @@ Context Logger 将 Codex 或 Claude Code 的一个明确 Session 保存为可核
 
 适合希望保存、核验或恢复一个明确开发 Session 的 Claude Code / Codex 用户，以及需要在不同宿主间管理项目上下文的维护者。
 
-1. 安装前阅读下方 Hook 保留与恢复边界。
+1. 安装前阅读[「安装」](#安装)中的 Hook 保留与恢复说明，并核对 [SKILL.md 的「来源边界」](SKILL.md#来源边界)。
 2. 先按「精确解析」运行 `resolve`，核对来源、Session 与归档目标。
 3. 再以相同参数执行 `save`；用 `verify` 判断各数据层是否一致。
 
@@ -130,7 +130,6 @@ Context Logger 只把严格匹配 `chunk-六位数字.md` 的文件识别为正�
 ## 许可证
 
 MIT © 2026 Eric Mingle (Ming-Sir-69)
-
 
 ## 贡献与维护
 
