@@ -3,6 +3,16 @@
 Context Logger 将 Codex 或 Claude Code 的一个明确 Session 保存为可核验的本地上下文。
 它不调用摘要模型，也不依赖向量数据库。
 
+## 先从这里开始
+
+适合希望保存、核验或恢复一个明确开发 Session 的 Claude Code / Codex 用户，以及需要在不同宿主间管理项目上下文的维护者。
+
+1. 安装前阅读下方 Hook 保留与恢复边界。
+2. 先按「精确解析」运行 `resolve`，核对来源、Session 与归档目标。
+3. 再以相同参数执行 `save`；用 `verify` 判断各数据层是否一致。
+
+完整 Agent 工作约定见 [SKILL.md](SKILL.md)；命令入口为 [scripts/transcript_manager.py](scripts/transcript_manager.py)。当前范围与未支持来源见「来源边界」。
+
 ## 数据层
 
 每个 Session 同时保留：
@@ -120,3 +130,10 @@ Context Logger 只把严格匹配 `chunk-六位数字.md` 的文件识别为正�
 ## 许可证
 
 MIT © 2026 Eric Mingle (Ming-Sir-69)
+
+
+## 贡献与维护
+
+欢迎通过 Issue 或 Pull Request 补充来源兼容性、解析错误与文档改进。请提供最小脱敏样例、命令参数和预期行为；会话正文、Raw 文件与本机凭据无需上传。涉及归档格式的修改应说明对增量保存与重建的影响。
+
+仓库维护：[Ming-Sir-69](https://github.com/Ming-Sir-69)。完整许可与既有版权声明见 [LICENSE](LICENSE)。
