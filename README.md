@@ -1,80 +1,23 @@
-# Context Logger
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="readme-assets/header-dark.svg">
+  <source media="(prefers-color-scheme: light)" srcset="readme-assets/header-light.svg">
+  <img alt="Context Logger · 保存开发上下文 · ✦ EricMingle69" src="readme-assets/header-light.svg" width="100%">
+</picture>
 
-Context Logger 将 Codex 或 Claude Code 的一个明确 Session 保存为可核验的本地上下文。
-它不调用摘要模型，也不依赖向量数据库。
+<p align="center">
+  <a href="README.md">简体中文</a> · <a href="README.en.md">English</a> · <a href="PERSONAL-NOTICE.md">✦ EricMingle69</a>
+</p>
 
-## 先从这里开始
+# Context Logger · 保存开发上下文
 
-适合希望保存、核验或恢复一个明确开发 Session 的 Claude Code / Codex 用户，以及需要在不同宿主间管理项目上下文的维护者。
+把一个明确的 Codex 或 Claude Code Session 保存为可核验的本地上下文。
+无需摘要模型或向量数据库；Raw 是事实源，Markdown 与 SQLite 索引可重建。
 
-1. 安装前阅读[「安装」](#安装)中的 Hook 保留与恢复说明，并核对 [SKILL.md 的「来源边界」](SKILL.md#来源边界)。
-2. 先按「精确解析」运行 `resolve`，核对来源、Session 与归档目标。
-3. 再以相同参数执行 `save`；用 `verify` 判断各数据层是否一致。
+## 先解析，再保存
 
-完整 Agent 工作约定见 [SKILL.md](SKILL.md)；命令入口为 [scripts/transcript_manager.py](scripts/transcript_manager.py)。当前范围与未支持来源见「来源边界」。
+从仓库根目录使用命令入口，替换下列占位符：
 
-## 数据层
-
-每个 Session 同时保留：
-
-1. 来源 JSONL 的字节保真 Raw；
-2. 跨宿主统一的 Normalized 事件；
-3. 面向 AI 的分段 Markdown 和两级 Index；
-4. 可删除、可重建的 SQLite FTS5 全文索引。
-
-用户和 AI 正文跨 Markdown Chunk 完整保留。工具输入和 Markdown 工具结果只展示
-前 2,000 字符，但始终保留 Raw 引用；工具结果在 FTS5 中最多索引 8,000 字符。
-
-## 安装
-
-在仓库根目录运行以下入口，会为真实的 Claude Code 配置保留式注册
-`SessionStart` 锚点：写入 `~/.claude/settings.json` 与
-`~/.claude/hooks/context-logger-session-anchor.sh`，使用当前仓库的脚本。
-`install.sh` 不转发命令行参数，不能通过这个 shell 入口指定临时目标或恢复基线。
-
-```bash
-bash install.sh
-```
-
-需要隔离核对 Hook 配置时，直接使用 Python 安装入口，并将 settings 与 Hook
-两个写入目标都指定到同一个新建临时目录：
-
-```bash
-context_logger_check_dir="$(mktemp -d)"
-python3 scripts/install_claude_hook.py \
-  --settings "$context_logger_check_dir/settings.json" \
-  --script "$PWD/scripts/transcript_manager.py" \
-  --hook-script "$context_logger_check_dir/context-logger-session-anchor.sh"
-```
-
-此例只为临时目标生成 settings、备份和 Hook 文件，不向真实的 `~/.claude/`
-登记 Hook；它不把整个工具复制到临时目录。以上命令依据当前源码静态核对，未实际执行。
-
-安装器会保留 Claude 的其他设置与其他 Hook，并在没有既有备份时创建
-`settings.json.context-logger.bak`；已有备份不会覆盖。
-
-如果已有 `settings.json` 的 `hooks` 缺失或为 `null`，安装器会停止，避免把未知的
-既有登记误当成空配置。确认可信基线后，通过 Python 入口显式恢复。下面是真实
-Claude 配置的恢复示例，会写入真实 settings 与 Hook；必须先将基线路径替换为
-已确认的本机文件：
-
-```bash
-python3 scripts/install_claude_hook.py \
-  --settings "$HOME/.claude/settings.json" \
-  --script "$PWD/scripts/transcript_manager.py" \
-  --hook-script "$HOME/.claude/hooks/context-logger-session-anchor.sh" \
-  --restore-hooks-from "/absolute/path/to/hooks-baseline.json"
-```
-
-基线文件必须包含非空的 `{ "hooks": { ... } }`。恢复只取基线的 `hooks` 字段，随后
-保留式登记本工具的 `SessionStart` Hook；其他 Claude 设置及原 settings 文件权限
-保持不变。本次未运行恢复命令或修改任何 Hook。
-
-## 精确解析
-
-Codex 使用当前 Thread ID：
-
-```bash
+```sh
 python3 scripts/transcript_manager.py resolve \
   --source codex \
   --session-id <current-thread-id> \
@@ -82,74 +25,46 @@ python3 scripts/transcript_manager.py resolve \
   --module-id <registered-module-id>
 ```
 
-Claude Code 的 `SessionStart` Hook 会写入不含对话正文的短期锚点。当前 Session
-可以使用 Hook 注入的环境锚点，也可以显式传入 Session ID 或 Transcript 文件：
+Claude Code 使用 `--source claude-code` 和明确的 Session ID；也可按 [SKILL.md](SKILL.md)使用 SessionStart 锚点。
+核对来源、Session 和归档目标后，用相同解析参数执行 `save`。
+再以已解析的归档目录运行 `verify --target-dir /absolute/path/to/archive --session-id <session-id>`；占位路径与 ID 必须替换。
+只有 `verify` 返回 `verified=true` 才说明数据层一致。
 
-```bash
-python3 scripts/transcript_manager.py resolve \
-  --source claude-code \
-  --session-id <current-session-id> \
-  --project-root /absolute/path/to/workspace \
-  --module-id <registered-module-id>
+## 四层数据
+
+| 层 | 用途 |
+| --- | --- |
+| Raw JSONL | 原始字节及重建依据 |
+| Normalized 事件 | 跨宿主统一事件 |
+| Markdown Chunk / Index | 正文阅读与定位 |
+| SQLite FTS5 | 可删除、可重建的全文索引 |
+
+用户与 AI 正文在 Markdown 分片中完整保留。
+工具输入和结果的 Markdown 展示最多 2,000 字符，结果索引最多 8,000 字符；完整内容仍有 Raw 引用。
+
+## Claude Hook 安装
+
+```sh
+bash install.sh
 ```
 
-受管工作区若使用 `context_policy=require_registered_module`，归档目标必须命中
-`workspace.json` 中登记的模块；不会在工作区根目录创建 Transcript。
+该入口保留式登记 SessionStart，写入真实 `~/.claude/settings.json` 与 Hook 文件。
+`install.sh` 不转发参数；临时目标或恢复必须直接使用 [Python 安装器](scripts/install_claude_hook.py)。
+既有 `hooks` 缺失或为 `null` 时会停止，需提供可信基线，而非假定配置为空。
 
-## 生命周期命令
+## 检索与恢复
 
-先完成 `resolve` 并检查输出，再使用相同的 Session 与目标参数执行 `save`。
+先读模块 `INDEX.md`，再用 `search` 找候选、`show` 读相关 Chunk，避免全量加载 Transcript。
+`rebuild-index` 从 Raw 与 Manifest 重建派生层；派生失败时 Raw 保留，状态标记 `needs_rebuild`。
+受管工作区的策略要求目标命中已登记模块，不自动在根目录创建 Transcript。
 
-```text
-anchor          接收 Claude Code SessionStart JSON 并静默写入锚点
-resolve         只读解析来源、Session、工作区、模块和目标
-save            增量保存 Raw 并重建派生层
-status          显示模块归档与旧布局状态
-search          使用 SQLite FTS5 按预算检索
-show            展示 Session Index、Chunk 或事件
-rebuild-index   从 Raw 和 Manifest 重建全部派生层
-verify          核验 Raw、Normalized、Markdown、SQLite 和 State
-compress        兼容性生成旧 JSONL 的确定性预览
-merge           仅在显式 --legacy 时非破坏整理旧平铺归档
-```
+## 来源与许可
 
-恢复上下文时先读取模块 `INDEX.md`，再使用 `search` 定位候选，最后用 `show`
-加载少量相关 Chunk。不要直接读取整个 Transcript 目录。
+支持范围见 [SKILL.md 的来源边界](SKILL.md#来源边界)，普通 ChatGPT 聊天不在当前范围。
+会话正文、Raw 与凭据应留在本机授权范围内，反馈使用脱敏样例。
+[MIT License](LICENSE)：Copyright (c) 2026 Eric Mingle (Ming-Sir-69)。
 
-## 存储布局
+---
 
-```text
-project_context/transcripts/
-├── INDEX.md
-├── index/context.sqlite3
-└── sessions/<source>_<session-id>/
-    ├── manifest.json
-    ├── state.json
-    ├── INDEX.md
-    ├── raw/part-*.jsonl
-    ├── normalized/events-*.jsonl
-    └── context/chunk-NNNNNN.md
-```
-
-Raw 和 Manifest 是重建事实源。派生失败时 Raw 仍保留，`state.json` 会标记
-`needs_rebuild`。只有 `verify` 返回 `verified=true` 才表示各层一致。
-Context Logger 只把严格匹配 `chunk-六位数字.md` 的文件识别为正式分片；
-云盘生成的 `chunk-000001 2.md` 等冲突副本不会被读取、索引、计数或自动删除。
-
-## 来源边界
-
-- Codex：支持 Thread ID 或显式 Session 文件；
-- Claude Code：支持短期 Hook 锚点或显式 Session 文件；
-- Claude Cowork：没有经过验证的完整 Transcript 时返回 `unsupported`，不会冒充
-  Claude Code，也不会抓取私有接口；
-- ChatGPT 普通聊天：不在本工具当前范围。
-
-## 许可证
-
-MIT © 2026 Eric Mingle (Ming-Sir-69)
-
-## 贡献与维护
-
-欢迎通过 Issue 或 Pull Request 补充来源兼容性、解析错误与文档改进。请提供最小脱敏样例、命令参数和预期行为；会话正文、Raw 文件与本机凭据无需上传。涉及归档格式的修改应说明对增量保存与重建的影响。
-
-仓库维护：[Ming-Sir-69](https://github.com/Ming-Sir-69)。完整许可与既有版权声明见 [LICENSE](LICENSE)。
+文档维护：**✦ EricMingle69** · [Ming-Sir-69](https://github.com/Ming-Sir-69)  
+[个人标识、许可与权限说明](PERSONAL-NOTICE.md) · 明暗页眉随 GitHub 主题自动切换。
